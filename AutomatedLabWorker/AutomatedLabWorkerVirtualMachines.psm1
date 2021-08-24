@@ -512,16 +512,19 @@ function New-LWHypervVM
             #for Generation 2 VMs
             $vhdOsPartition = $VhdPartition | Where-Object Type -eq 'Basic'
             # If no drive letter is assigned, make sure we assign it before continuing
-            If ($vhdOsPartition.NoDefaultDriveLetter) {
+            # $vhdOsPartition.NoDefaultDriveLetter on windows 2019 it doesn't contain any bool , so below a workarround
+     If ($vhdOsPartition.NoDefaultDriveLetter -ne $false) {
                 # Get all available drive letters, and store in a temporary variable.
                 $usedDriveLetters = @(Get-Volume | ForEach-Object { "$([char]$_.DriveLetter)" }) + @(Get-CimInstance -ClassName Win32_MappedLogicalDisk | ForEach-Object { $([char]$_.DeviceID.Trim(':')) })
                 [char[]]$tempDriveLetters = Compare-Object -DifferenceObject $usedDriveLetters -ReferenceObject $( 67..90 | ForEach-Object { "$([char]$_)" }) -PassThru | Where-Object { $_.SideIndicator -eq '<=' }
                 # Sort the available drive letters to get the first available drive letter
                 $availableDriveLetters = ($TempDriveLetters | Sort-Object)
                 $firstAvailableDriveLetter = $availableDriveLetters[0]
+                # on windows 2019 it needs to be set online and readable
+                set-disk -Number $vhdOsPartition.DiskNumber -IsOffline $false
                 $vhdOsPartition | Set-Partition -NewDriveLetter $firstAvailableDriveLetter
+                set-disk -Number $vhdOsPartition.DiskNumber -IsReadOnly $false
                 $VhdVolume = "$($firstAvailableDriveLetter):"
-
             }
             Else
             {
